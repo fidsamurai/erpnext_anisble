@@ -1,0 +1,82 @@
+---
+- name: Install pre-requisite packages
+  become: yes
+  become_user: root
+  package:
+    name: ['git', 'curl', 'wget', 'cron', 'supervisor', 'nginx']
+    state: present
+- name: Install NodeJS
+  get_url:
+    url: https://deb.nodesource.com/setup_10.x
+    dest: /tmp/
+- shell: bash /tmp/setup_10.x
+- package:
+    name: nodejs
+    state: present
+
+- block:
+    - name: add redis-server apt repo
+      apt_repository:
+        repo: ppa:chris-lea/redis-server
+    - name: Install redis-server
+      package:
+        name: redis-server
+        state: present
+    - name: Start redis-Server
+      shell: /etc/init.d/redis-server start
+
+- name: Create new non-root user
+  user:
+    name: "{{ userName }}"
+    shell: /bin/bash
+    home: "/home/{{ userName }}"
+
+- name: cd into directory and git clone bench
+  git:
+    repo: https://github.com/frappe/bench
+    dest: "/home/{{ userName }}/bench"
+
+- name: Install Bench app
+  pip:
+    name: bench
+    executable: pip3
+    extra_args: -e
+    chdir: "/home/{{ userName }}"
+
+- name: bench init
+  become: yes
+  become_user: "{{ userName }}"
+  shell: "bench init {{ bench_name }}"
+  args:
+    chdir: "/home/{{ userName }}"
+    executable: /bin/bash
+
+- name: Install erpnext app
+  become: yes
+  become_user: "{{ userName }}"
+  shell: bench get-app erpnext https://github.com/frappe/erpnext
+  args:
+    chdir: "/home/{{ userName }}/{{ bench_name }}"
+
+- name: Create site
+  become: yes
+  become_user: "{{ userName }}"
+  shell: |
+    bench set-mariadb-host {{ dbhost }}
+    bench new-site {{ siteName }} --db-host {{ db_host }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --install-app erpnext --force
+  args:
+    chdir: "/home/{{ userName }}/{{ bench_name }}"
+
+- name: setup nginx supervisor procfile
+  become: yes
+  become_user: "{{ userName }}"
+  shell: bench setup production {{ userName }}
+  args:
+    chdir: "/home/{{ userName }}/{{ bench_name }}"
+
+- name: start supervisorctl
+  become: yes
+  become_user: root
+  supervisorctl:
+    name: ALL
+    state: started

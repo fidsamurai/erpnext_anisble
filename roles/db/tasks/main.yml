@@ -1,0 +1,59 @@
+---
+- name: Install Mariadb
+  package:
+    name: ['mariadb-server', 'python3-pymysql', python-pymysql]
+    state: present
+
+- name: Install python3-pymysql
+  become: yes
+  become_user: root
+  pip:
+    name: PyMySQL
+    executable: pip3
+
+- name: Start Mysql Server
+  shell: /etc/init.d/mysql start
+
+- name: mysql config
+  template:
+    src: templates/my.cnf
+    dest: /etc/mysql/my.cnf
+    owner: root
+    mode: 0600
+  notify: restart mariadb
+
+- name: Set root root_password
+  become: yes
+  become_user: root
+  mysql_user:
+    name: root
+    password: "{{ mysql_root_password }}"
+    host_all: yes
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    check_implicit_admin: no
+    state: present
+
+- name: Copy my.cnf to root
+  template:
+    src: templates/root.cnf
+    dest: /root/.my.cnf
+    owner: root
+    mode: 0600
+
+- name: Create DB "{{ dbname }}"
+  become: yes
+  become_user: root
+  mysql_db:
+    name: "{{ dbname }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    state: present
+
+- name: create user and password for erpnext
+  mysql_user:
+    name: "{{ dbuser }}"
+    password: "{{ dbpass }}"
+    host: '%'
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    config_file: ~/.my.cnf
+    priv: '*.*:ALL,GRANT'
+    state: present

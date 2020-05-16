@@ -1,0 +1,15 @@
+#bench set_dbhost
+dbhost: 172.17.0.3
+
+#bench site name
+siteName: fid.test.com
+
+#bench_name
+bench_name: prod-bench
+userName: bench
+
+#MySql
+dbuser: erpnext
+dbpass: erpnext
+dbname: erpnext
+mysql_root_password: redhat237

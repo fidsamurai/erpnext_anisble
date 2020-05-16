@@ -1,0 +1,17 @@
+---
+- name: DB setup
+  hosts: db
+  roles:
+    - common
+    - db
+
+- name: erp
+  hosts: erp
+  roles:
+    - common
+    - erp
+  environment:
+    PATH: "{{ ansible_env.PATH }}:/usr/local/bin"
+    PATH: "{{ ansible_env.PATH }}:/usr/bin/git"
+    LC_ALL: C.UTF-8
+    LANG: C.UTF-8
