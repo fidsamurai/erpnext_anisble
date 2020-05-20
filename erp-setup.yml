@@ -2,13 +2,13 @@
 - name: DB setup
   hosts: db
   roles:
-    - common
-    - db
+    #- common
+    #- db
 
 - name: erp
   hosts: erp
   roles:
-    - common
+    #- common
     - erp
   environment:
     PATH: "{{ ansible_env.PATH }}:/usr/local/bin"

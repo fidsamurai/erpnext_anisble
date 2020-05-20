@@ -1,15 +1,8 @@
 ---
 - name: Install Mariadb
   package:
-    name: ['mariadb-server', 'python3-pymysql', python-pymysql]
+    name: ['mariadb-server', 'python3', 'python3-pip', 'python3-setuptools', 'python3-pymysql', python-pymysql]
     state: present
-
-- name: Install python3-pymysql
-  become: yes
-  become_user: root
-  pip:
-    name: PyMySQL
-    executable: pip3
 
 - name: Start Mysql Server
   shell: /etc/init.d/mysql start

@@ -1,5 +1,5 @@
 #bench set_dbhost
-dbhost: 172.17.0.3
+dbhost: 172.17.0.2
 
 #bench site name
 siteName: fid.test.com
@@ -7,6 +7,7 @@ siteName: fid.test.com
 #bench_name
 bench_name: prod-bench
 userName: bench
+adminPass: Test
 
 #MySql
 dbuser: erpnext

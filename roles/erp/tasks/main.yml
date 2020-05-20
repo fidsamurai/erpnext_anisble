@@ -1,18 +1,36 @@
 ---
-- name: Install pre-requisite packages
+- block:
+    - name: Install NodeJS
+      get_url:
+        url: https://deb.nodesource.com/setup_10.x
+        dest: /tmp/
+    - shell: bash /tmp/setup_10.x
+    - package:
+        name: nodejs
+        state: present
+    - npm: name=yarn global=yes
   become: yes
   become_user: root
-  package:
-    name: ['git', 'curl', 'wget', 'cron', 'supervisor', 'nginx']
-    state: present
-- name: Install NodeJS
-  get_url:
-    url: https://deb.nodesource.com/setup_10.x
-    dest: /tmp/
-- shell: bash /tmp/setup_10.x
-- package:
-    name: nodejs
-    state: present
+
+- block:
+    - name: Install pre-requisite packages
+      become: yes
+      become_user: root
+      package:
+        name: ['git', 'curl', 'wget', 'cron', 'supervisor', 'nginx', 'zlib1g-dev', 'libssl-dev', 'python-openssl']
+        state: present
+    - name: Install Python3.6
+      get_url:
+        url: https://www.python.org/ftp/python/3.6.10/Python-3.6.10.tar.xz
+        dest: /tmp/python-3.6.tar.xz
+    - unarchive:
+        src: /tmp/python-3.6.tar.xz
+        dest: /tmp/
+        remote_src: yes
+    - shell: |
+        cd /tmp/Python-3.6.10
+        ./configure && make && make install
+  become: yes
 
 - block:
     - name: add redis-server apt repo
@@ -39,37 +57,37 @@
 - name: Install Bench app
   pip:
     name: bench
-    executable: pip3
+    executable: pip3.6
     extra_args: -e
     chdir: "/home/{{ userName }}"
 
 - name: bench init
   become: yes
   become_user: "{{ userName }}"
-  shell: "bench init {{ bench_name }}"
+  shell: "bench init --python /usr/local/bin/python3.6 {{ bench_name }}"
   args:
     chdir: "/home/{{ userName }}"
     executable: /bin/bash
 
-- name: Install erpnext app
-  become: yes
-  become_user: "{{ userName }}"
-  shell: bench get-app erpnext https://github.com/frappe/erpnext
-  args:
-    chdir: "/home/{{ userName }}/{{ bench_name }}"
+#- name: Get erpnext app
+#  become: yes
+#  become_user: "{{ userName }}"
+#  shell: bench get-app erpnext https://github.com/frappe/erpnext
+#  args:
+#    chdir: "/home/{{ userName }}/{{ bench_name }}"
 
 - name: Create site
   become: yes
   become_user: "{{ userName }}"
   shell: |
     bench set-mariadb-host {{ dbhost }}
-    bench new-site {{ siteName }} --db-host {{ db_host }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --install-app erpnext --force
+    bench new-site {{ siteName }} --db-host {{ dbhost }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --admin-password {{ adminPass }} --install-app erpnext --force
   args:
     chdir: "/home/{{ userName }}/{{ bench_name }}"
 
-- name: setup nginx supervisor procfile
+- name: Bench setup production
   become: yes
-  become_user: "{{ userName }}"
+  become_user: root
   shell: bench setup production {{ userName }}
   args:
     chdir: "/home/{{ userName }}/{{ bench_name }}"

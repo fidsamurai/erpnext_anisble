@@ -1,7 +1,7 @@
 ---
-- name: Install python3
+- name: Install common packages
   package:
-    name: ['python3', 'python3-pip', 'python3-setuptools', 'build-essential', 'sudo']
+    name: ['build-essential', 'sudo']
     state: present
 
 - name: Ansible key file
