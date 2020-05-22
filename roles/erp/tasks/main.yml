@@ -1,5 +1,20 @@
 ---
 - block:
+    - name: Check for requirements Python v3.6
+      shell: python3 --version
+      register: python_version
+    - name: Check for nodejs
+      shell: yarn --version
+      register: yarn_version
+    - name: Check for Redis-Server
+      shell: redis-server --version
+      register: redis_server
+    - name: Check for erpnext_app
+      shell: ls /home/{{ userName }}/{{ bench_name }}/apps/erpnext
+      register: erpnext_app
+  ignore_errors: yes
+
+- block:
     - name: Install NodeJS
       get_url:
         url: https://deb.nodesource.com/setup_10.x
@@ -11,26 +26,26 @@
     - npm: name=yarn global=yes
   become: yes
   become_user: root
+  when: yarn_version.failed == true
+
+- name: Install pre-requisite packages
+  become: yes
+  become_user: root
+  package:
+    name: ['git', 'curl', 'wget', 'cron', 'supervisor', 'nginx', 'zlib1g-dev', 'libssl-dev', 'python-openssl']
+    state: present
 
 - block:
-    - name: Install pre-requisite packages
-      become: yes
-      become_user: root
-      package:
-        name: ['git', 'curl', 'wget', 'cron', 'supervisor', 'nginx', 'zlib1g-dev', 'libssl-dev', 'python-openssl']
-        state: present
     - name: Install Python3.6
-      get_url:
-        url: https://www.python.org/ftp/python/3.6.10/Python-3.6.10.tar.xz
-        dest: /tmp/python-3.6.tar.xz
-    - unarchive:
-        src: /tmp/python-3.6.tar.xz
+      unarchive:
+        src: https://www.python.org/ftp/python/3.6.10/Python-3.6.10.tar.xz
         dest: /tmp/
         remote_src: yes
     - shell: |
         cd /tmp/Python-3.6.10
         ./configure && make && make install
   become: yes
+  when: python_version < 3.6
 
 - block:
     - name: add redis-server apt repo
@@ -42,48 +57,53 @@
         state: present
     - name: Start redis-Server
       shell: /etc/init.d/redis-server start
+  become: yes
+  when: redis_server.failed == true
 
 - name: Create new non-root user
   user:
     name: "{{ userName }}"
     shell: /bin/bash
     home: "/home/{{ userName }}"
+  become: yes
 
-- name: cd into directory and git clone bench
-  git:
-    repo: https://github.com/frappe/bench
-    dest: "/home/{{ userName }}/bench"
+- block:
+    - name: cd into directory and git clone bench
+      become: yes
+      become_user: root
+      git:
+        repo: https://github.com/frappe/bench
+        dest: "/home/{{ userName }}/bench"
 
-- name: Install Bench app
-  pip:
-    name: bench
-    executable: pip3.6
-    extra_args: -e
-    chdir: "/home/{{ userName }}"
+    - name: Install Bench app
+      become: yes
+      become_user: root
+      pip:
+        name: bench
+        executable: pip3.6
+        extra_args: -e
+        chdir: "/home/{{ userName }}"
 
-- name: bench init
+    - name: bench init
+      shell: "bench init --python /usr/local/bin/python3.6 {{ bench_name }}"
+      args:
+        chdir: "/home/{{ userName }}"
+        executable: /bin/bash
+
+    - name: Get erpnext app
+      shell: bench get-app erpnext https://github.com/frappe/erpnext
+      args:
+        chdir: "/home/{{ userName }}/{{ bench_name }}"
+      when: erpnext_app.failed == true
+
+    - name: Create site
+      shell: |
+        bench set-mariadb-host {{ dbhost }}
+        bench new-site {{ siteName }} --db-host {{ dbhost }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --admin-password {{ adminPass }} --install-app erpnext --force
+      args:
+        chdir: "/home/{{ userName }}/{{ bench_name }}"
   become: yes
   become_user: "{{ userName }}"
-  shell: "bench init --python /usr/local/bin/python3.6 {{ bench_name }}"
-  args:
-    chdir: "/home/{{ userName }}"
-    executable: /bin/bash
-
-#- name: Get erpnext app
-#  become: yes
-#  become_user: "{{ userName }}"
-#  shell: bench get-app erpnext https://github.com/frappe/erpnext
-#  args:
-#    chdir: "/home/{{ userName }}/{{ bench_name }}"
-
-- name: Create site
-  become: yes
-  become_user: "{{ userName }}"
-  shell: |
-    bench set-mariadb-host {{ dbhost }}
-    bench new-site {{ siteName }} --db-host {{ dbhost }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --admin-password {{ adminPass }} --install-app erpnext --force
-  args:
-    chdir: "/home/{{ userName }}/{{ bench_name }}"
 
 - name: Bench setup production
   become: yes
