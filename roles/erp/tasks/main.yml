@@ -12,6 +12,15 @@
     - name: Check for erpnext_app
       shell: ls /home/{{ userName }}/{{ bench_name }}/apps/erpnext
       register: erpnext_app
+    - name: Check for conf setup
+      shell: ls /etc/supervisor/conf.d/{{ bench_name }}.conf
+      register: conf_setup
+    - name: Check for existing site
+      shell: ls /home/{{ userName }}/{{ bench_name }}/sites/{{ siteName }}
+      register: site_exists
+    - name: Supervisorctl status
+      shell: /etc/init.d/supervisor status
+      register: supervisor_status
   ignore_errors: yes
 
 - block:
@@ -99,9 +108,10 @@
     - name: Create site
       shell: |
         bench set-mariadb-host {{ dbhost }}
-        bench new-site {{ siteName }} --db-host {{ dbhost }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --admin-password {{ adminPass }} --install-app erpnext --force
+        bench new-site {{ siteName }} --db-host {{ dbhost }} --db-name {{ dbname }} --mariadb-root-username {{ dbuser }} --mariadb-root-password {{ dbpass }} --admin-password {{ adminPass }} --install-app erpnext #add --force if task needs to repeated
       args:
         chdir: "/home/{{ userName }}/{{ bench_name }}"
+      when: site_exists.failed == true
   become: yes
   become_user: "{{ userName }}"
 
@@ -111,10 +121,10 @@
   shell: bench setup production {{ userName }}
   args:
     chdir: "/home/{{ userName }}/{{ bench_name }}"
+  when: conf_setup.failed == true
 
 - name: start supervisorctl
   become: yes
   become_user: root
-  supervisorctl:
-    name: ALL
-    state: started
+  shell: /etc/init.d/supervisor start
+  ignore_errors: yes
