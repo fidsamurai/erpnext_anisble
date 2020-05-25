@@ -1,7 +1,7 @@
 ---
 - name: Install common packages
   package:
-    name: ['build-essential', 'sudo']
+    name: ['build-essential', 'sudo', 'locales']
     state: present
 
 - name: Ansible key file
